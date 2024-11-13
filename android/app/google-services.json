@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "899737607192",
+    "project_id": "flutex-admin-e2a7a",
+    "storage_bucket": "flutex-admin-e2a7a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:899737607192:android:cfa4f20ba1937dba6eb76d",
+        "android_client_info": {
+          "package_name": "com.flutex.admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAK9g4BaStcUY9e3nCKv-YyRd-fQG4MwY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
