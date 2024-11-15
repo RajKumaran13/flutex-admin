@@ -14,6 +14,7 @@ import 'core/di_service/di_services.dart' as services;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  //firebase initialization
   try{
     await Firebase.initializeApp(
       options: const FirebaseOptions(
@@ -52,7 +53,9 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   @override
+  
   Widget build(BuildContext context) {
+    
     return GetBuilder<ThemeController>(builder: (theme) {
       return GetBuilder<LocalizationController>(builder: (localizeController) {
         return GetMaterialApp(

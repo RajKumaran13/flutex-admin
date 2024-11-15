@@ -1,4 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 //import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutex_admin/core/route/route.dart';
 import 'package:flutex_admin/core/utils/color_resources.dart';
@@ -12,9 +14,6 @@ import 'package:flutex_admin/view/components/custom_loader/custom_loader.dart';
 import 'package:flutex_admin/view/components/will_pop_widget.dart';
 import 'package:flutex_admin/view/screens/home/widget/dashboard_card.dart';
 import 'package:flutex_admin/view/screens/home/widget/drawer.dart';
-import 'package:flutex_admin/view/screens/home/widget/home_estimates_card.dart';
-import 'package:flutex_admin/view/screens/home/widget/home_invoices_card.dart';
-import 'package:flutex_admin/view/screens/home/widget/home_proposals_card.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutex_admin/data/controller/home/home_controller.dart';
@@ -29,6 +28,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final User? user = FirebaseAuth.instance.currentUser;
+  bool isLoading = false;
+  Map<String, dynamic>? overviewData;
+
   @override
   void initState() {
     Get.put(ApiClient(sharedPreferences: Get.find()));
@@ -39,8 +42,28 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      checkSession();
       controller.initialData();
     });
+  }
+
+  // Firestore stream function
+  Stream<DocumentSnapshot<Map<String, dynamic>>> _getDashboardStream() {
+    return FirebaseFirestore.instance
+        .collection('dashboard')
+        .doc('overview')
+        .snapshots();
+  }
+  void checkSession() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      // Navigate to login screen
+      Get.offNamed('/login');
+    } else {
+      // User logged in
+      print('Logged in as: ${user.email}');
+    }
   }
 
   int currentPageIndex = 0;
@@ -51,57 +74,62 @@ class _HomeScreenState extends State<HomeScreen> {
       nextRoute: '',
       child: GetBuilder<HomeController>(builder: (controller) {
         return Scaffold(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          appBar: AppBar(
-            toolbarHeight: 50,
-            leading: Builder(builder: (context) {
-              return IconButton(
-                icon: const Icon(
-                  Icons.menu_rounded,
-                  size: 30,
-                  color: Colors.white,
-                ),
-                onPressed: () {
-                  Scaffold.of(context).openDrawer();
-                },
-                tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
-              );
-            }),
-            centerTitle: true,
-            title: CachedNetworkImage(
-                imageUrl: controller.homeModel.overview?.perfexLogo ?? '',
-                fit: BoxFit.cover,
-                height: 30,
-                errorWidget: (ctx, object, trx) {
-                  return Image.asset(
-                    MyImages.appLogo,
-                    fit: BoxFit.cover,
-                    height: 30,
-                  );
-                },
-                placeholder: (ctx, trx) {
-                  return Image.asset(
-                    MyImages.appLogo,
-                  );
-                }),
-            actions: [
-              ActionButtonIconWidget(
-                pressed: () => Get.toNamed(RouteHelper.settingsScreen),
-                icon: Icons.settings,
-                size: 35,
-                iconColor: Colors.white,
-              ),
-            ],
-          ),
-          drawer: const HomeDrawer(),
-          body: controller.isLoading
-              ? const CustomLoader()
-              : RefreshIndicator(
-                  color: ColorResources.primaryColor,
-                  onRefresh: () async {
-                    await controller.initialData(shouldLoad: false);
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            appBar: AppBar(
+              toolbarHeight: 50,
+              leading: Builder(builder: (context) {
+                return IconButton(
+                  icon: const Icon(
+                    Icons.menu_rounded,
+                    size: 30,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    Scaffold.of(context).openDrawer();
                   },
-                  child: SingleChildScrollView(
+                  tooltip:
+                      MaterialLocalizations.of(context).openAppDrawerTooltip,
+                );
+              }),
+              centerTitle: true,
+              title: CachedNetworkImage(
+                  imageUrl: controller.homeModel.overview?.perfexLogo ?? '',
+                  fit: BoxFit.cover,
+                  height: 30,
+                  errorWidget: (ctx, object, trx) {
+                    return Image.asset(
+                      MyImages.appLogo,
+                      fit: BoxFit.cover,
+                      height: 30,
+                    );
+                  },
+                  placeholder: (ctx, trx) {
+                    return Image.asset(
+                      MyImages.appLogo,
+                    );
+                  }),
+              actions: [
+                ActionButtonIconWidget(
+                  pressed: () => Get.toNamed(RouteHelper.settingsScreen),
+                  icon: Icons.settings,
+                  size: 35,
+                  iconColor: Colors.white,
+                ),
+              ],
+            ),
+            drawer: const HomeDrawer(),
+            body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: _getDashboardStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CustomLoader());
+                  }
+                  if (!snapshot.hasData || !snapshot.data!.exists) {
+                    return const Center(child: Text('No data available'));
+                  }
+
+                  final data = snapshot.data!.data()!;
+                  return SingleChildScrollView(
                     padding: const EdgeInsets.all(Dimensions.space10),
                     child: Column(
                       children: [
@@ -138,8 +166,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                               .color),
                                     ),
                                     TextSpan(
-                                      text:
-                                          '${controller.homeModel.staff?.firstName ?? ''} ${controller.homeModel.staff?.lastName ?? ''}',
+                                      // text: overviewData?['name'] ?? '',
+                                      // '${controller.homeModel.staff?.firstName ?? ''} ${controller.homeModel.staff?.lastName ?? ''}',
                                       style: regularLarge.copyWith(
                                           color: Theme.of(context)
                                               .textTheme
@@ -149,7 +177,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ])),
                                   const SizedBox(height: Dimensions.space5),
                                   Text(
-                                    controller.homeModel.staff?.email ?? '',
+                                    data['name'] ?? '',
+                                    // controller.homeModel.staff?.email ?? '',
                                     style: regularSmall.copyWith(
                                         color: ColorResources.blueGreyColor),
                                   )
@@ -162,60 +191,91 @@ class _HomeScreenState extends State<HomeScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             DashboardCard(
-                              currentValue: controller.homeModel.overview
-                                      ?.invoicesAwaitingPaymentTotal ??
-                                  0,
-                              totalValue: controller
-                                      .homeModel.overview?.totalInvoices ??
-                                  0,
-                              percent: controller.homeModel.overview
-                                      ?.invoicesAwaitingPaymentPercent ??
-                                  '0',
+                              currentValue:
+                                  data['invoicesAwaitingPaymentTotal'] ?? 0,
+                              totalValue: data['totalInvoices'] ?? 0,
+                              percent:
+                                  data['invoicesAwaitingPaymentPercent'] ?? '0',
                               icon: Icons.attach_money_rounded,
-                              title: LocalStrings.invoicesAwaitingPayment.tr,
+                              title: 'Invoices Awaiting Payment',
                             ),
+                            // DashboardCard(
+                            //   currentValue: controller.homeModel.overview
+                            //           ?.invoicesAwaitingPaymentTotal ??
+                            //       0,
+                            //   totalValue: controller
+                            //           .homeModel.overview?.totalInvoices ??
+                            //       0,
+                            //   percent: controller.homeModel.overview
+                            //           ?.invoicesAwaitingPaymentPercent ??
+                            //       '0',
+                            //   icon: Icons.attach_money_rounded,
+                            //   title: LocalStrings.invoicesAwaitingPayment.tr,
+                            // ),
+                            // DashboardCard(
+                            //   currentValue: controller.homeModel.overview
+                            //           ?.leadsConvertedTotal ??
+                            //       0,
+                            //   totalValue:
+                            //       controller.homeModel.overview?.totalLeads ??
+                            //           0,
+                            //   percent: controller.homeModel.overview
+                            //           ?.leadsConvertedPercent ??
+                            //       '0',
+                            //   icon: Icons.move_up_rounded,
+                            //   title: LocalStrings.convertedLeads.tr,
+                            // ),
                             DashboardCard(
-                              currentValue: controller.homeModel.overview
-                                      ?.leadsConvertedTotal ??
-                                  0,
-                              totalValue:
-                                  controller.homeModel.overview?.totalLeads ??
-                                      0,
-                              percent: controller.homeModel.overview
-                                      ?.leadsConvertedPercent ??
-                                  '0',
+                              currentValue: data['leadsConvertedTotal'] ?? 0,
+                              totalValue: data['totalLeads'] ?? 0,
+                              percent: data['leadsConvertedPercent'] ?? '0',
                               icon: Icons.move_up_rounded,
-                              title: LocalStrings.convertedLeads.tr,
+                              title: 'Converted Leads',
                             ),
                           ],
                         ),
                         Row(
                           children: [
+                            // DashboardCard(
+                            //   currentValue: controller.homeModel.overview
+                            //           ?.notFinishedTasksTotal ??
+                            //       0,
+                            //   totalValue:
+                            //       controller.homeModel.overview?.totalTasks ??
+                            //           0,
+                            //   percent: controller.homeModel.overview
+                            //           ?.notFinishedTasksPercent ??
+                            //       '0',
+                            //   icon: Icons.task_outlined,
+                            //   title: LocalStrings.notCompleted.tr,
+                            // ),
                             DashboardCard(
-                              currentValue: controller.homeModel.overview
-                                      ?.notFinishedTasksTotal ??
-                                  0,
-                              totalValue:
-                                  controller.homeModel.overview?.totalTasks ??
-                                      0,
-                              percent: controller.homeModel.overview
-                                      ?.notFinishedTasksPercent ??
-                                  '0',
+                              currentValue: data['notFinishedTasksTotal'] ?? 0,
+                              totalValue: data['totalTasks'] ?? 0,
+                              percent: data['notFinishedTasksPercent'] ?? '0',
                               icon: Icons.task_outlined,
-                              title: LocalStrings.notCompleted.tr,
+                              title: 'Not Completed',
                             ),
+                            // DashboardCard(
+                            //   currentValue: controller.homeModel.overview
+                            //           ?.projectsInProgressTotal ??
+                            //       0,
+                            //   totalValue: controller
+                            //           .homeModel.overview?.totalProjects ??
+                            //       0,
+                            //   percent: controller.homeModel.overview
+                            //           ?.inProgressProjectsPercent ??
+                            //       '0',
+                            //   icon: Icons.dashboard_customize_rounded,
+                            //   title: LocalStrings.projectsInProgress.tr,
+                            // ),
                             DashboardCard(
-                              currentValue: controller.homeModel.overview
-                                      ?.projectsInProgressTotal ??
-                                  0,
-                              totalValue: controller
-                                      .homeModel.overview?.totalProjects ??
-                                  0,
-                              percent: controller.homeModel.overview
-                                      ?.inProgressProjectsPercent ??
-                                  '0',
+                              currentValue:
+                                  data['projectsInProgressTotal'] ?? 0,
+                              totalValue: data['totalProjects'] ?? 0,
+                              percent: data['inProgressProjectsPercent'] ?? '0',
                               icon: Icons.dashboard_customize_rounded,
-                              title: LocalStrings.projectsInProgress.tr,
+                              title: 'Projects in Progress',
                             ),
                           ],
                         ),
@@ -264,9 +324,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         )))),
                       ],
                     ),
-                  ),
-                ),
-        );
+                  );
+                }));
       }),
     );
   }

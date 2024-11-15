@@ -1,3 +1,5 @@
+ import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutex_admin/core/route/route.dart';
 import 'package:flutex_admin/core/utils/local_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -23,6 +25,9 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController(text: 'admin@demo.com');
+  final TextEditingController _passwordController = TextEditingController(text: '123456');
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
@@ -40,6 +45,24 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     super.dispose();
+  }
+  Future<void> _login() async {
+    if (formKey.currentState!.validate()) {
+      try {
+        UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        print('Login successful: ${userCredential.user?.email}');
+        // Navigate to admin dashboard or home screen
+         Get.offAndToNamed(RouteHelper.dashboardScreen);
+      } catch (e) {
+        print('Login failed: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -115,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 CustomTextField(
                                   animatedLabel: true,
                                   needOutlineBorder: true,
-                                  controller: controller.emailController,
+                                  controller: _emailController,
                                   labelText: LocalStrings.email.tr,
                                   onChanged: (value) {},
                                   focusNode: controller.emailFocusNode,
@@ -135,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   animatedLabel: true,
                                   needOutlineBorder: true,
                                   labelText: LocalStrings.password.tr,
-                                  controller: controller.passwordController,
+                                  controller: _passwordController,
                                   focusNode: controller.passwordFocusNode,
                                   onChanged: (value) {},
                                   isShowSuffixIcon: true,
@@ -210,10 +233,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                     : RoundedButton(
                                         text: LocalStrings.signIn.tr,
                                         press: () {
-                                          if (formKey.currentState!
-                                              .validate()) {
-                                            controller.loginUser();
-                                          }
+                                          _login();
+                                          // if (formKey.currentState!
+                                          //     .validate()) {
+                                          //   controller.loginUser();
+                                          // }
                                         }),
                               ],
                             ),
